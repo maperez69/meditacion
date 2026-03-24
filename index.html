@@ -503,6 +503,8 @@ let data = {
 function load() {
     const s = localStorage.getItem('meditData2');
     if (s) data = { ...data, ...JSON.parse(s) };
+    // Si no hay URL guardada, usar la ruta relativa por defecto
+    if (!data.audioUrl) data.audioUrl = 'meditacion.mp3';
     renderUI();
     initAudio();
 }
