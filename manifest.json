@@ -1,0 +1,19 @@
+{
+  "name": "MAPA · Meditación Diaria",
+  "short_name": "MAPA Medita",
+  "description": "Meditaciones guiadas diarias · Marco Pérez de Acha",
+  "start_url": "/meditacion/",
+  "scope": "/meditacion/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0a0c10",
+  "theme_color": "#0a0c10",
+  "icons": [
+    {
+      "src": "apple-touch-icon.png",
+      "sizes": "180x180",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
