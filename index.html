@@ -136,6 +136,30 @@
         }
         .player-card.playing::before { opacity: 1; }
 
+        /* ─── Track selector ─── */
+        #trackSelect {
+            width: 100%;
+            padding: 12px 40px 12px 16px;
+            background: var(--surface2);
+            border: 1px solid rgba(255,255,255,.1);
+            border-radius: 12px;
+            color: var(--text);
+            font-family: 'DM Sans', sans-serif;
+            font-size: 15px;
+            font-weight: 500;
+            cursor: pointer;
+            outline: none;
+            appearance: none;
+            -webkit-appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%238b949e' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 16px center;
+            margin-bottom: 16px;
+            transition: border-color .2s;
+        }
+        #trackSelect:focus { border-color: var(--accent); }
+        #trackSelect option { background: #1e2530; }
+
         .track-title {
             font-family: 'Cormorant Garamond', serif;
             font-size: 20px;
@@ -407,8 +431,14 @@
 
     <!-- Audio player -->
     <div class="player-card" id="playerCard">
-        <div class="track-title" id="trackTitle">Meditación de Gratitud</div>
-        <div class="track-sub" id="trackSub">Respiración Consciente</div>
+        <select id="trackSelect" onchange="changeTrack()">
+            <option value="meditacion_agradecer.mpeg">🙏 Agradecer</option>
+            <option value="meditacion_dormir.mpeg">🌙 Dormir</option>
+            <option value="meditacion_perdonar.mpeg">🕊 Perdonar</option>
+            <option value="meditacion_respirar.mpeg">🌬 Respirar</option>
+            <option value="meditacion_visualizar.mpeg">✨ Visualizar</option>
+        </select>
+        <div class="track-title" id="trackTitle">Agradecer</div>
 
         <!-- Waveform bars -->
         <div class="waveform" id="waveform"></div>
@@ -441,7 +471,7 @@
     </div>
 
     <!-- Hidden audio element -->
-    <audio id="audioEl" src="meditacion.mpeg" preload="metadata"></audio>
+    <audio id="audioEl" src="meditacion_agradecer.mpeg" preload="metadata"></audio>
 
     <!-- Mark complete -->
     <button class="complete-btn" id="completeBtn" onclick="markComplete()">
@@ -465,50 +495,49 @@
     <!-- Settings -->
     <div class="settings">
         <h3>⚙ Configuración</h3>
-        <div class="input-grp">
-            <label>URL del audio (MP3 / OGG / AAC)</label>
-            <input type="text" id="audioUrl" placeholder="https://…/meditacion.mp3" oninput="saveAudioUrl()">
-        </div>
-        <div class="input-grp">
-            <label>Nombre de la pista</label>
-            <input type="text" id="trackName" placeholder="Meditación de Gratitud" oninput="saveTrackName()">
-        </div>
         <button class="sec-btn" onclick="setupReminder()">🔔 Activar recordatorios</button>
     </div>
 
     <div class="tip-box">
-        <p>💡 Cómo configurar el audio:</p>
+        <p>💡 Uso rápido:</p>
         <ol>
-            <li>Sube tu MP3 a Google Drive, Dropbox o iCloud y obtén el enlace directo</li>
-            <li>Pega la URL en el campo de arriba — se guarda automáticamente</li>
-            <li>También puedes usar archivos .ogg o .aac</li>
-            <li>Añade esta página a inicio de Safari para acceso rápido</li>
+            <li>Selecciona la meditación del día en el desplegable</li>
+            <li>Presiona ▶ para comenzar</li>
+            <li>Al terminar, marca como completado para sumar racha</li>
+            <li>Añade esta página a inicio de Safari para acceso directo</li>
         </ol>
     </div>
 
 </div>
 
 <script>
+// ─── Playlist ────────────────────────────────────────────
+const TRACKS = [
+    { file: 'meditacion_agradecer.mpeg',  label: 'Agradecer'   },
+    { file: 'meditacion_dormir.mpeg',     label: 'Dormir'      },
+    { file: 'meditacion_perdonar.mpeg',   label: 'Perdonar'    },
+    { file: 'meditacion_respirar.mpeg',   label: 'Respirar'    },
+    { file: 'meditacion_visualizar.mpeg', label: 'Visualizar'  },
+];
+
 // ─── State ───────────────────────────────────────────────
 let data = {
     streak: 0,
     totalDays: 0,
     lastCompleted: null,
     history: {},
-    audioUrl: 'meditacion.mpeg',
-    trackName: 'Meditación de Gratitud'
+    currentTrack: 0
 };
 
 // ─── Load / Save ─────────────────────────────────────────
 function load() {
-    const s = localStorage.getItem('meditData2');
+    const s = localStorage.getItem('meditData3');
     if (s) data = { ...data, ...JSON.parse(s) };
-    // Si no hay URL guardada, usar la ruta relativa por defecto
-    if (!data.audioUrl) data.audioUrl = 'meditacion.mpeg';
     renderUI();
-    initAudio();
+    loadTrack(data.currentTrack);
+    buildWaveform();
 }
-function save() { localStorage.setItem('meditData2', JSON.stringify(data)); }
+function save() { localStorage.setItem('meditData3', JSON.stringify(data)); }
 
 // ─── UI ───────────────────────────────────────────────────
 function renderUI() {
@@ -519,17 +548,18 @@ function renderUI() {
     document.getElementById('totalDays').textContent  = data.totalDays;
     document.getElementById('totalSess').textContent  = data.totalDays;
     document.getElementById('weeksComp').textContent  = Math.floor(data.totalDays / 7);
-    document.getElementById('audioUrl').value         = data.audioUrl;
-    document.getElementById('trackName').value        = data.trackName;
-    document.getElementById('trackTitle').textContent = data.trackName;
+
+    // sync selector
+    document.getElementById('trackSelect').value = TRACKS[data.currentTrack]?.file || TRACKS[0].file;
+    document.getElementById('trackTitle').textContent = TRACKS[data.currentTrack]?.label || '';
 
     // motivational
     const n = data.streak;
     let msg = 'Comienza tu viaje hoy';
-    if (n === 1)          msg = '¡Primer día completado! 🎉';
-    else if (n < 7)       msg = `¡Vas muy bien! ${n} días seguidos`;
-    else if (n < 30)      msg = `¡Increíble constancia! ${n} días`;
-    else                  msg = `¡Maestro de la mente! ${n} días`;
+    if (n === 1)      msg = '¡Primer día completado! 🎉';
+    else if (n < 7)   msg = `¡Vas muy bien! ${n} días seguidos`;
+    else if (n < 30)  msg = `¡Increíble constancia! ${n} días`;
+    else              msg = `¡Maestro de la mente! ${n} días`;
     document.getElementById('motivMsg').textContent = msg;
 
     // complete button
@@ -550,13 +580,11 @@ function renderWeek() {
     const wrap  = document.getElementById('weekRow');
     wrap.innerHTML = '';
     const todayStr = new Date().toDateString();
-
     for (let i = 6; i >= 0; i--) {
         const d    = new Date(Date.now() - i * 86400000);
         const dStr = d.toDateString();
         const done = !!data.history[dStr];
         const isToday = dStr === todayStr;
-
         wrap.innerHTML += `
           <div class="day-col">
             <div class="day-dot ${done ? 'done' : 'empty'}${isToday ? ' today' : ''}">
@@ -568,30 +596,45 @@ function renderWeek() {
 }
 
 // ─── Audio ───────────────────────────────────────────────
-const audio  = document.getElementById('audioEl');
-const playBtn = document.getElementById('playBtn');
-const seekBar = document.getElementById('seekBar');
+const audio    = document.getElementById('audioEl');
+const playBtn  = document.getElementById('playBtn');
+const seekBar  = document.getElementById('seekBar');
 const progFill = document.getElementById('progFill');
-const timeCur = document.getElementById('timeCur');
-const timeTot = document.getElementById('timeTot');
-const volBar  = document.getElementById('volBar');
-const card    = document.getElementById('playerCard');
+const timeCur  = document.getElementById('timeCur');
+const timeTot  = document.getElementById('timeTot');
+const volBar   = document.getElementById('volBar');
+const card     = document.getElementById('playerCard');
 
-function initAudio() {
-    if (data.audioUrl) {
-        audio.src = data.audioUrl;
-    }
-    buildWaveform();
+function loadTrack(index) {
+    const wasPlaying = !audio.paused;
+    audio.pause();
+    playBtn.textContent = '▶';
+    card.classList.remove('playing');
+    progFill.style.width = '0%';
+    timeCur.textContent = '0:00';
+    timeTot.textContent = '0:00';
+    seekBar.value = 0;
+
+    audio.src = TRACKS[index].file;
+    audio.load();
+    document.getElementById('trackTitle').textContent = TRACKS[index].label;
+    if (wasPlaying) audio.play().then(() => { playBtn.textContent = '⏸'; card.classList.add('playing'); }).catch(()=>{});
+}
+
+function changeTrack() {
+    const sel = document.getElementById('trackSelect').value;
+    const idx = TRACKS.findIndex(t => t.file === sel);
+    if (idx === -1) return;
+    data.currentTrack = idx;
+    save();
+    loadTrack(idx);
 }
 
 function fmt(s) {
     if (isNaN(s)) return '0:00';
-    const m = Math.floor(s / 60);
-    const sec = Math.floor(s % 60);
-    return `${m}:${sec.toString().padStart(2,'0')}`;
+    return `${Math.floor(s/60)}:${Math.floor(s%60).toString().padStart(2,'0')}`;
 }
 
-// Waveform bars
 function buildWaveform() {
     const wf = document.getElementById('waveform');
     wf.innerHTML = '';
@@ -621,8 +664,7 @@ playBtn.addEventListener('click', () => {
 
 audio.addEventListener('timeupdate', () => {
     if (!audio.duration) return;
-    const pct = (audio.currentTime / audio.duration) * 100;
-    progFill.style.width = pct + '%';
+    progFill.style.width = (audio.currentTime / audio.duration * 100) + '%';
     seekBar.value = audio.currentTime;
     timeCur.textContent = fmt(audio.currentTime);
 });
@@ -639,13 +681,8 @@ audio.addEventListener('ended', () => {
     timeCur.textContent = '0:00';
 });
 
-seekBar.addEventListener('input', () => {
-    audio.currentTime = parseFloat(seekBar.value);
-});
-
-volBar.addEventListener('input', () => {
-    audio.volume = parseFloat(volBar.value);
-});
+seekBar.addEventListener('input', () => { audio.currentTime = parseFloat(seekBar.value); });
+volBar.addEventListener('input',  () => { audio.volume = parseFloat(volBar.value); });
 
 document.getElementById('skipBackBtn').addEventListener('click', () => {
     audio.currentTime = Math.max(0, audio.currentTime - 15);
@@ -659,27 +696,12 @@ function markComplete() {
     const today     = new Date().toDateString();
     const yesterday = new Date(Date.now() - 86400000).toDateString();
     if (data.lastCompleted === today) return;
-
     data.streak = data.lastCompleted === yesterday ? data.streak + 1 : 1;
     data.totalDays++;
     data.lastCompleted = today;
     data.history[today] = true;
     save();
     renderUI();
-}
-
-// ─── Settings callbacks ───────────────────────────────────
-function saveAudioUrl() {
-    data.audioUrl = document.getElementById('audioUrl').value.trim();
-    audio.src = data.audioUrl;
-    audio.load();
-    save();
-}
-
-function saveTrackName() {
-    data.trackName = document.getElementById('trackName').value || 'Meditación';
-    document.getElementById('trackTitle').textContent = data.trackName;
-    save();
 }
 
 function setupReminder() {
