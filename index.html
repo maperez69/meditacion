@@ -1,0 +1,695 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="Meditación">
+    <title>Meditación Diaria</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg:        #0d1117;
+            --surface:   #161b22;
+            --surface2:  #1e2530;
+            --accent:    #7dd3c0;
+            --accent2:   #a78bfa;
+            --text:      #e6edf3;
+            --muted:     #8b949e;
+            --green:     #56d364;
+            --orange:    #f97316;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'DM Sans', sans-serif;
+            background: var(--bg);
+            min-height: 100vh;
+            padding: 24px 16px 48px;
+            color: var(--text);
+        }
+
+        /* ─── Ambient orb ─── */
+        body::before {
+            content: '';
+            position: fixed;
+            top: -120px; left: 50%;
+            transform: translateX(-50%);
+            width: 500px; height: 400px;
+            background: radial-gradient(ellipse, rgba(125,211,192,.12) 0%, transparent 70%);
+            pointer-events: none;
+            transition: opacity .8s;
+        }
+
+        .container { max-width: 440px; margin: 0 auto; }
+
+        /* ─── Header ─── */
+        .header {
+            text-align: center;
+            padding: 28px 0 32px;
+        }
+        .header h1 {
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 38px;
+            font-weight: 300;
+            color: var(--accent);
+            letter-spacing: .04em;
+            margin-bottom: 6px;
+        }
+        .header h1 span { font-style: italic; color: var(--accent2); }
+        .header p {
+            font-size: 13px;
+            color: var(--muted);
+            letter-spacing: .06em;
+            text-transform: uppercase;
+        }
+
+        /* ─── Card ─── */
+        .card {
+            background: var(--surface);
+            border-radius: 20px;
+            padding: 24px;
+            margin-bottom: 16px;
+            border: 1px solid rgba(255,255,255,.06);
+        }
+
+        /* ─── Streak row ─── */
+        .streak-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+        }
+        .streak-item { display: flex; align-items: center; gap: 12px; }
+        .flame-icon { font-size: 36px; }
+        .streak-num {
+            font-size: 40px;
+            font-weight: 500;
+            color: var(--orange);
+            line-height: 1;
+        }
+        .total-num {
+            font-size: 28px;
+            font-weight: 500;
+            color: var(--accent2);
+            line-height: 1;
+        }
+        .lbl { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; margin-bottom: 2px; }
+
+        /* ─── Week progress ─── */
+        .week-row {
+            display: flex;
+            justify-content: space-between;
+        }
+        .day-col { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+        .day-dot {
+            width: 36px; height: 36px;
+            border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 14px;
+        }
+        .day-dot.done   { background: var(--green); color: #0d1117; font-weight: 600; }
+        .day-dot.empty  { background: var(--surface2); color: var(--muted); }
+        .day-dot.today  { ring: 2px solid var(--accent); box-shadow: 0 0 0 2px var(--accent); }
+        .day-name { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+
+        /* ─── Audio Player ─── */
+        .player-card {
+            background: var(--surface);
+            border-radius: 20px;
+            padding: 28px 24px 24px;
+            margin-bottom: 16px;
+            border: 1px solid rgba(255,255,255,.06);
+            position: relative;
+            overflow: hidden;
+        }
+        .player-card::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: radial-gradient(ellipse at 50% -30%, rgba(125,211,192,.08) 0%, transparent 60%);
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity .6s;
+        }
+        .player-card.playing::before { opacity: 1; }
+
+        .track-title {
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 20px;
+            font-weight: 300;
+            color: var(--text);
+            margin-bottom: 4px;
+            text-align: center;
+        }
+        .track-sub {
+            font-size: 11px;
+            color: var(--muted);
+            text-align: center;
+            margin-bottom: 24px;
+            text-transform: uppercase;
+            letter-spacing: .07em;
+        }
+
+        /* Waveform animation */
+        .waveform {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 4px;
+            height: 40px;
+            margin-bottom: 20px;
+        }
+        .bar {
+            width: 3px;
+            border-radius: 2px;
+            background: var(--accent);
+            opacity: .25;
+            transition: opacity .3s;
+            animation: none;
+        }
+        .player-card.playing .bar {
+            opacity: 1;
+            animation: wave var(--dur, .8s) ease-in-out infinite alternate;
+        }
+        @keyframes wave {
+            from { transform: scaleY(1);   }
+            to   { transform: scaleY(var(--peak, 3)); }
+        }
+
+        /* Progress */
+        .progress-wrap {
+            margin-bottom: 8px;
+            position: relative;
+        }
+        .progress-track {
+            width: 100%;
+            height: 4px;
+            background: var(--surface2);
+            border-radius: 2px;
+            cursor: pointer;
+            position: relative;
+            overflow: hidden;
+        }
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--accent), var(--accent2));
+            border-radius: 2px;
+            width: 0%;
+            transition: width .2s linear;
+            pointer-events: none;
+        }
+        input[type=range].seek {
+            position: absolute;
+            inset: -8px 0;
+            opacity: 0;
+            cursor: pointer;
+            width: 100%;
+            height: 20px;
+        }
+
+        .time-row {
+            display: flex;
+            justify-content: space-between;
+            font-size: 11px;
+            color: var(--muted);
+            margin-bottom: 20px;
+        }
+
+        /* Controls */
+        .controls {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 20px;
+        }
+        .ctrl-btn {
+            background: none;
+            border: none;
+            cursor: pointer;
+            color: var(--muted);
+            font-size: 20px;
+            transition: color .2s, transform .15s;
+            padding: 4px;
+        }
+        .ctrl-btn:hover { color: var(--text); }
+        .ctrl-btn:active { transform: scale(.9); }
+
+        .play-btn {
+            width: 60px; height: 60px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--accent), var(--accent2));
+            border: none;
+            cursor: pointer;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 22px;
+            box-shadow: 0 0 24px rgba(125,211,192,.25);
+            transition: transform .15s, box-shadow .3s;
+            color: #0d1117;
+        }
+        .play-btn:active { transform: scale(.93); }
+        .player-card.playing .play-btn { box-shadow: 0 0 32px rgba(125,211,192,.45); }
+
+        /* Volume */
+        .volume-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-top: 16px;
+        }
+        .vol-icon { font-size: 14px; color: var(--muted); }
+        input[type=range].vol {
+            flex: 1;
+            -webkit-appearance: none;
+            height: 3px;
+            background: var(--surface2);
+            border-radius: 2px;
+            outline: none;
+            cursor: pointer;
+        }
+        input[type=range].vol::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 12px; height: 12px;
+            border-radius: 50%;
+            background: var(--accent);
+        }
+
+        /* ─── Complete button ─── */
+        .complete-btn {
+            width: 100%;
+            padding: 18px;
+            border-radius: 14px;
+            border: 1.5px solid var(--accent2);
+            background: transparent;
+            color: var(--accent2);
+            font-family: 'DM Sans', sans-serif;
+            font-size: 15px;
+            font-weight: 500;
+            cursor: pointer;
+            letter-spacing: .04em;
+            transition: background .2s, color .2s, transform .15s;
+            margin-bottom: 16px;
+        }
+        .complete-btn:hover { background: rgba(167,139,250,.1); }
+        .complete-btn:active { transform: scale(.98); }
+        .complete-btn.done {
+            background: rgba(86,211,100,.1);
+            border-color: var(--green);
+            color: var(--green);
+            pointer-events: none;
+        }
+
+        /* ─── Stats ─── */
+        .stats-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+        .stat-box {
+            background: var(--surface);
+            border-radius: 16px;
+            padding: 18px;
+            border: 1px solid rgba(255,255,255,.06);
+        }
+        .stat-icon { font-size: 28px; margin-bottom: 6px; }
+        .stat-num { font-size: 28px; font-weight: 500; color: var(--text); line-height: 1; margin-bottom: 4px; }
+        .stat-lbl { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
+
+        /* ─── Settings ─── */
+        .settings {
+            background: var(--surface);
+            border-radius: 20px;
+            padding: 20px 24px;
+            margin-bottom: 16px;
+            border: 1px solid rgba(255,255,255,.06);
+        }
+        .settings h3 {
+            font-size: 13px;
+            color: var(--muted);
+            text-transform: uppercase;
+            letter-spacing: .07em;
+            margin-bottom: 16px;
+        }
+        .input-grp { margin-bottom: 14px; }
+        .input-grp label { display: block; font-size: 11px; color: var(--muted); margin-bottom: 6px; text-transform: uppercase; letter-spacing: .05em; }
+        .input-grp input {
+            width: 100%;
+            padding: 10px 12px;
+            background: var(--surface2);
+            border: 1px solid rgba(255,255,255,.08);
+            border-radius: 8px;
+            color: var(--text);
+            font-size: 13px;
+            font-family: 'DM Sans', sans-serif;
+            outline: none;
+            transition: border-color .2s;
+        }
+        .input-grp input:focus { border-color: var(--accent); }
+
+        .sec-btn {
+            width: 100%;
+            padding: 12px;
+            border-radius: 10px;
+            background: var(--surface2);
+            border: 1px solid rgba(255,255,255,.08);
+            color: var(--text);
+            font-family: 'DM Sans', sans-serif;
+            font-size: 13px;
+            cursor: pointer;
+            transition: background .2s;
+        }
+        .sec-btn:hover { background: rgba(255,255,255,.08); }
+
+        /* ─── Tip box ─── */
+        .tip-box {
+            background: rgba(167,139,250,.07);
+            border: 1px solid rgba(167,139,250,.2);
+            border-radius: 14px;
+            padding: 16px;
+            margin-bottom: 40px;
+        }
+        .tip-box p { font-size: 12px; color: var(--accent2); font-weight: 500; margin-bottom: 8px; }
+        .tip-box ol { color: var(--muted); font-size: 11px; margin-left: 18px; }
+        .tip-box li { margin-bottom: 4px; line-height: 1.5; }
+
+        /* ─── Hidden audio ─── */
+        #audioEl { display: none; }
+    </style>
+</head>
+<body>
+<div class="container">
+
+    <div class="header">
+        <h1>Medi<span>tación</span></h1>
+        <p id="motivMsg">Comienza tu viaje hoy</p>
+    </div>
+
+    <!-- Streak & week -->
+    <div class="card">
+        <div class="streak-row">
+            <div class="streak-item">
+                <div class="flame-icon">🔥</div>
+                <div>
+                    <div class="lbl">Racha actual</div>
+                    <div class="streak-num" id="streakNum">0</div>
+                </div>
+            </div>
+            <div style="text-align:right">
+                <div class="lbl">Total días</div>
+                <div class="total-num" id="totalDays">0</div>
+            </div>
+        </div>
+        <div class="week-row" id="weekRow"></div>
+    </div>
+
+    <!-- Audio player -->
+    <div class="player-card" id="playerCard">
+        <div class="track-title" id="trackTitle">Meditación de Gratitud</div>
+        <div class="track-sub" id="trackSub">Respiración Consciente</div>
+
+        <!-- Waveform bars -->
+        <div class="waveform" id="waveform"></div>
+
+        <!-- Seek bar -->
+        <div class="progress-wrap">
+            <div class="progress-track">
+                <div class="progress-fill" id="progFill"></div>
+                <input type="range" class="seek" id="seekBar" min="0" value="0" step="0.1">
+            </div>
+        </div>
+        <div class="time-row">
+            <span id="timeCur">0:00</span>
+            <span id="timeTot">0:00</span>
+        </div>
+
+        <!-- Controls -->
+        <div class="controls">
+            <button class="ctrl-btn" id="skipBackBtn" title="–15s">⏮ 15s</button>
+            <button class="play-btn" id="playBtn">▶</button>
+            <button class="ctrl-btn" id="skipFwdBtn" title="+15s">15s ⏭</button>
+        </div>
+
+        <!-- Volume -->
+        <div class="volume-row">
+            <span class="vol-icon">🔈</span>
+            <input type="range" class="vol" id="volBar" min="0" max="1" step="0.02" value="1">
+            <span class="vol-icon">🔊</span>
+        </div>
+    </div>
+
+    <!-- Hidden audio element -->
+    <audio id="audioEl" preload="metadata"></audio>
+
+    <!-- Mark complete -->
+    <button class="complete-btn" id="completeBtn" onclick="markComplete()">
+        ✦ Marcar como completado
+    </button>
+
+    <!-- Stats -->
+    <div class="stats-row">
+        <div class="stat-box">
+            <div class="stat-icon">📈</div>
+            <div class="stat-num" id="totalSess">0</div>
+            <div class="stat-lbl">Sesiones</div>
+        </div>
+        <div class="stat-box">
+            <div class="stat-icon">🏆</div>
+            <div class="stat-num" id="weeksComp">0</div>
+            <div class="stat-lbl">Semanas</div>
+        </div>
+    </div>
+
+    <!-- Settings -->
+    <div class="settings">
+        <h3>⚙ Configuración</h3>
+        <div class="input-grp">
+            <label>URL del audio (MP3 / OGG / AAC)</label>
+            <input type="text" id="audioUrl" placeholder="https://…/meditacion.mp3" oninput="saveAudioUrl()">
+        </div>
+        <div class="input-grp">
+            <label>Nombre de la pista</label>
+            <input type="text" id="trackName" placeholder="Meditación de Gratitud" oninput="saveTrackName()">
+        </div>
+        <button class="sec-btn" onclick="setupReminder()">🔔 Activar recordatorios</button>
+    </div>
+
+    <div class="tip-box">
+        <p>💡 Cómo configurar el audio:</p>
+        <ol>
+            <li>Sube tu MP3 a Google Drive, Dropbox o iCloud y obtén el enlace directo</li>
+            <li>Pega la URL en el campo de arriba — se guarda automáticamente</li>
+            <li>También puedes usar archivos .ogg o .aac</li>
+            <li>Añade esta página a inicio de Safari para acceso rápido</li>
+        </ol>
+    </div>
+
+</div>
+
+<script>
+// ─── State ───────────────────────────────────────────────
+let data = {
+    streak: 0,
+    totalDays: 0,
+    lastCompleted: null,
+    history: {},
+    audioUrl: '',
+    trackName: 'Meditación de Gratitud'
+};
+
+// ─── Load / Save ─────────────────────────────────────────
+function load() {
+    const s = localStorage.getItem('meditData2');
+    if (s) data = { ...data, ...JSON.parse(s) };
+    renderUI();
+    initAudio();
+}
+function save() { localStorage.setItem('meditData2', JSON.stringify(data)); }
+
+// ─── UI ───────────────────────────────────────────────────
+function renderUI() {
+    const today = new Date().toDateString();
+    const done  = data.lastCompleted === today;
+
+    document.getElementById('streakNum').textContent  = data.streak;
+    document.getElementById('totalDays').textContent  = data.totalDays;
+    document.getElementById('totalSess').textContent  = data.totalDays;
+    document.getElementById('weeksComp').textContent  = Math.floor(data.totalDays / 7);
+    document.getElementById('audioUrl').value         = data.audioUrl;
+    document.getElementById('trackName').value        = data.trackName;
+    document.getElementById('trackTitle').textContent = data.trackName;
+
+    // motivational
+    const n = data.streak;
+    let msg = 'Comienza tu viaje hoy';
+    if (n === 1)          msg = '¡Primer día completado! 🎉';
+    else if (n < 7)       msg = `¡Vas muy bien! ${n} días seguidos`;
+    else if (n < 30)      msg = `¡Increíble constancia! ${n} días`;
+    else                  msg = `¡Maestro de la mente! ${n} días`;
+    document.getElementById('motivMsg').textContent = msg;
+
+    // complete button
+    const btn = document.getElementById('completeBtn');
+    if (done) {
+        btn.textContent = '✓ Completado hoy';
+        btn.className = 'complete-btn done';
+    } else {
+        btn.textContent = '✦ Marcar como completado';
+        btn.className = 'complete-btn';
+    }
+
+    renderWeek();
+}
+
+function renderWeek() {
+    const names = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
+    const wrap  = document.getElementById('weekRow');
+    wrap.innerHTML = '';
+    const todayStr = new Date().toDateString();
+
+    for (let i = 6; i >= 0; i--) {
+        const d    = new Date(Date.now() - i * 86400000);
+        const dStr = d.toDateString();
+        const done = !!data.history[dStr];
+        const isToday = dStr === todayStr;
+
+        wrap.innerHTML += `
+          <div class="day-col">
+            <div class="day-dot ${done ? 'done' : 'empty'}${isToday ? ' today' : ''}">
+              ${done ? '✓' : ''}
+            </div>
+            <div class="day-name">${names[d.getDay()]}</div>
+          </div>`;
+    }
+}
+
+// ─── Audio ───────────────────────────────────────────────
+const audio  = document.getElementById('audioEl');
+const playBtn = document.getElementById('playBtn');
+const seekBar = document.getElementById('seekBar');
+const progFill = document.getElementById('progFill');
+const timeCur = document.getElementById('timeCur');
+const timeTot = document.getElementById('timeTot');
+const volBar  = document.getElementById('volBar');
+const card    = document.getElementById('playerCard');
+
+function initAudio() {
+    if (data.audioUrl) {
+        audio.src = data.audioUrl;
+    }
+    buildWaveform();
+}
+
+function fmt(s) {
+    if (isNaN(s)) return '0:00';
+    const m = Math.floor(s / 60);
+    const sec = Math.floor(s % 60);
+    return `${m}:${sec.toString().padStart(2,'0')}`;
+}
+
+// Waveform bars
+function buildWaveform() {
+    const wf = document.getElementById('waveform');
+    wf.innerHTML = '';
+    const peaks = [1.2,1.8,2.6,1.4,3.2,2.0,1.6,2.8,1.3,3.0,2.4,1.7,3.5,2.1,1.5,2.9,1.9,2.3,3.1,1.6];
+    peaks.forEach((p, i) => {
+        const bar = document.createElement('div');
+        bar.className = 'bar';
+        bar.style.height = `${6 + p * 6}px`;
+        bar.style.setProperty('--peak', p);
+        bar.style.setProperty('--dur', `${0.6 + Math.random() * 0.7}s`);
+        bar.style.animationDelay = `${i * 0.06}s`;
+        wf.appendChild(bar);
+    });
+}
+
+playBtn.addEventListener('click', () => {
+    if (!data.audioUrl) {
+        alert('Primero configura la URL del audio en ajustes.');
+        return;
+    }
+    if (audio.paused) {
+        audio.play();
+        playBtn.textContent = '⏸';
+        card.classList.add('playing');
+    } else {
+        audio.pause();
+        playBtn.textContent = '▶';
+        card.classList.remove('playing');
+    }
+});
+
+audio.addEventListener('timeupdate', () => {
+    if (!audio.duration) return;
+    const pct = (audio.currentTime / audio.duration) * 100;
+    progFill.style.width = pct + '%';
+    seekBar.value = audio.currentTime;
+    timeCur.textContent = fmt(audio.currentTime);
+});
+
+audio.addEventListener('loadedmetadata', () => {
+    seekBar.max = audio.duration;
+    timeTot.textContent = fmt(audio.duration);
+});
+
+audio.addEventListener('ended', () => {
+    playBtn.textContent = '▶';
+    card.classList.remove('playing');
+    progFill.style.width = '0%';
+    timeCur.textContent = '0:00';
+});
+
+seekBar.addEventListener('input', () => {
+    audio.currentTime = parseFloat(seekBar.value);
+});
+
+volBar.addEventListener('input', () => {
+    audio.volume = parseFloat(volBar.value);
+});
+
+document.getElementById('skipBackBtn').addEventListener('click', () => {
+    audio.currentTime = Math.max(0, audio.currentTime - 15);
+});
+document.getElementById('skipFwdBtn').addEventListener('click', () => {
+    audio.currentTime = Math.min(audio.duration || 0, audio.currentTime + 15);
+});
+
+// ─── Mark complete ────────────────────────────────────────
+function markComplete() {
+    const today     = new Date().toDateString();
+    const yesterday = new Date(Date.now() - 86400000).toDateString();
+    if (data.lastCompleted === today) return;
+
+    data.streak = data.lastCompleted === yesterday ? data.streak + 1 : 1;
+    data.totalDays++;
+    data.lastCompleted = today;
+    data.history[today] = true;
+    save();
+    renderUI();
+}
+
+// ─── Settings callbacks ───────────────────────────────────
+function saveAudioUrl() {
+    data.audioUrl = document.getElementById('audioUrl').value.trim();
+    audio.src = data.audioUrl;
+    audio.load();
+    save();
+}
+
+function saveTrackName() {
+    data.trackName = document.getElementById('trackName').value || 'Meditación';
+    document.getElementById('trackTitle').textContent = data.trackName;
+    save();
+}
+
+function setupReminder() {
+    alert('💡 Para recordatorios diarios:\n\n1. Abre "Recordatorios" en tu iPhone\n2. Crea uno: "Meditar 🧘"\n3. Activa la repetición diaria\n4. Elige tu hora favorita\n\n¡Tu iPhone te avisará cada día!');
+}
+
+// ─── Init ────────────────────────────────────────────────
+load();
+</script>
+</body>
+</html>
