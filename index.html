@@ -441,7 +441,7 @@
     </div>
 
     <!-- Hidden audio element -->
-    <audio id="audioEl" preload="metadata"></audio>
+    <audio id="audioEl" src="meditacion.mpeg" preload="metadata"></audio>
 
     <!-- Mark complete -->
     <button class="complete-btn" id="completeBtn" onclick="markComplete()">
@@ -495,7 +495,7 @@ let data = {
     totalDays: 0,
     lastCompleted: null,
     history: {},
-    audioUrl: 'meditacion.mp3',
+    audioUrl: 'meditacion.mpeg',
     trackName: 'Meditación de Gratitud'
 };
 
@@ -504,7 +504,7 @@ function load() {
     const s = localStorage.getItem('meditData2');
     if (s) data = { ...data, ...JSON.parse(s) };
     // Si no hay URL guardada, usar la ruta relativa por defecto
-    if (!data.audioUrl) data.audioUrl = 'meditacion.mp3';
+    if (!data.audioUrl) data.audioUrl = 'meditacion.mpeg';
     renderUI();
     initAudio();
 }
@@ -608,10 +608,6 @@ function buildWaveform() {
 }
 
 playBtn.addEventListener('click', () => {
-    if (!data.audioUrl) {
-        alert('Primero configura la URL del audio en ajustes.');
-        return;
-    }
     if (audio.paused) {
         audio.play();
         playBtn.textContent = '⏸';
